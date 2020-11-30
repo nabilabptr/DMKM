@@ -1,0 +1,115 @@
+---
+title: "UTS-DMKM"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+# Load Data
+```{r}
+library(readr)
+data <- read_csv("SomervilleHappinessSurvey2015.txt")
+head(data)
+```
+
+#Ubah Variabel sebagai Variabel Faktor
+Dalam mengklasifikasi, variabel harus diubah dalam bentuk faktor. Lalu ubah label pada variabel D 
+```{r}
+library(dplyr)
+data$D <- as.factor(data$D)
+data$D <- recode(data$D, '0'="Unhappy", '1'="Happy")
+data$X1 <- as.factor(data$X1)
+data$X2 <- as.factor(data$X2)
+data$X3 <- as.factor(data$X3)
+data$X4 <- as.factor(data$X4)
+data$X5 <- as.factor(data$X5)
+data$X6 <- as.factor(data$X6)
+
+str(data)
+names(data)
+```
+
+
+# Split Validation
+Bagi dua data dengan proporsi 80% data sebagai training data dan 20% data sebagai testing data. 
+```{r}
+set.seed(123)
+sampling <- sample(1:nrow(data), 0.8*nrow(data))
+training_set <- data[sampling,]
+test_set <- data[-sampling,]
+```
+
+Training data ini akan kita gunakan dalam pembuatan model. Lalu, model yang didapatkan akan kita uji dengan menggunkana testing data.
+
+# C4.5
+
+## Plot pohon keputusan
+```{r}
+library(RWeka)
+library(partykit)
+fit <- J48(D~., data=training_set)
+fit
+plot(fit)
+```
+
+## Prediksi
+```{r}
+library(caret)
+predik <- predict(fit, new = test_set)
+predik
+confusionMatrix(predik, test_set$D)
+```
+
+Interpretasi : 
+
+Akurasi prediksi dari model yang didapatkan adalah sebesar 65%. Dengan tingkat kepercayaan sebesar 95%, tingkat akurasi model berada pada rentang 52% hingga 96%.
+
+
+Sensitivity/recall bernilai 0,5 artinya terdapat 50% persen masyarakat yang tidak bahagia diprediksi dengan benar oleh model dari total masyarakat yang sebenarnya tidak bahagia. Berdasarkan total masyarakat yang sebenarnya tidak bahagia yaitu sebanyak 14 masyarakat, 7 diantaranya diprediksi dengan benar oleh model.
+
+Spesificity bernilai 0,8 artinya 80% persen masyarakat yang bahagia diprediksi dengan benar oleh model dari total masyarakat yang sebenarnya bahagia. Berdasarkan total masyarakat yang sebenarnya bahagia yaitu sebanyak 15 masyarakat, 12 diantaranya diprediksi dengan benar oleh model.
+
+Precision bernilai 0,7 artinya terdapat 70% persen prediksi masyarakat yang tidak bahagia adalah benar dari keseluruhan prediksi masyarakat yang tidak bahagia. Berdasarkan total prediksi masyarakat yang tidak bahagia yaitu sebanyak 10 masyarakat, 7 prediksi diantaranya adalah benar.
+
+F1 Score = 2 * (Recall*Precission) / (Recall + Precission) = 0,5833
+Perbandingan rata-rata presisi dan recall yang dibobotkan adalah sebesar 58%.
+
+
+# Naive Bayes
+## Load Library
+Tiga library yang dibutuhkan, yaitu **naivebayes, psych, dan caret**. Jika belum terinstall, silahkan install terlebih dahulu dengan perintah `install.packages("nama-package")`.
+
+Library **naivebayes** akan digunakan untuk membuat modelnya. Library **psych** akan digunakan untuk melihat korelasi antar variabel. Library **caret** digunakan untuk membuat confusion matriks dan melihar akurasi model.
+
+```{r message=FALSE, warning=FALSE}
+library(naivebayes)
+library(psych)
+library(caret)
+```
+
+
+## Pair Plot
+Melihat korelasi dari tiap variabel, kalau ada korelasi yang tinggi, hilangkan salah satu variabel
+```{r}
+pairs.panels(data)
+```
+
+Nilai koef. korelasi yang didapatkan tidak melebihi 0,5 maka kita tetapkan tidak ada variabel yang memiliki korelasi yang tinggi, oleh karena itu tidak ada variabel yang dihilangkan.
+
+## Membuat Model
+Gunakan atribut `laplace` untuk menghilangkan zero probability problem
+```{r message=FALSE, warning=FALSE}
+modelnaiv <- naive_bayes(D~.,data=training_set, laplace = T)
+modelnaiv
+```
+Summary Model
+```{r}
+summary(modelnaiv)
+```
+
+## Confusion Matrix
+```{r}
+prediksi <- predict(modelnaiv, test_set)
+confusionMatrix(table(prediksi,test_set$D))
+```
